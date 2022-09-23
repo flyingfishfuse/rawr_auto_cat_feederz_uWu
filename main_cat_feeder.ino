@@ -1,23 +1,27 @@
+/******************************************************************************
+Imports
+******************************************************************************/
 #include <Servo.h>
 #include <EEPROM.h>
 #include <rdm6300.h>
 #include <SoftwareSerial.h>
 #include <Arduino.h>
 
+/******************************************************************************
+Internal functionality
+******************************************************************************/
 // change for debugging output, button is internal
 static bool DEBUG true
 
 // switch to check if its being run for the first time
 bool first_run true
 
-/*
-Open Food Flap by activating servo when cat gets near opening
-*/
+/******************************************************************************
+servo variables
+******************************************************************************/
 // create servo object to control a servo
 Servo food_flap;
 Rdm6300 rdm6300;
-
-//SoftwareSerial SerialRFID = SoftwareSerial(6,8); 	//pins = Pins()
 
 // variable to store the current servo position
 int current_position = 0;
@@ -31,20 +35,13 @@ int full_down_position = 0;
 //if door is open currently
 bool DOOROPEN = false;
 
-/*/
-Stores cat RFID tag numbers for each cat set to edvice
-press button 1 to register a cat
-from then on, the door will open for that cat
-/*/
-#define MAX_CATS_ALLOWABLE 2
-#define CATREGISTRYSTARTADDRESS 1
-
-/*
+/******************************************************************************
 PINOUT
-	status:
-		pins chosen for uno and nano
-		
-*/
+******************************************************************************/
+//	status: In flux
+//	
+//	pins chosen for uno and nano
+
 #define ADDTOCATREGISTRYPIN 10
 #define CLEARCATREGISTRYPIN 9
 #define CAT_FLAP_SERVO_PIN 8
@@ -54,53 +51,35 @@ PINOUT
 #define RFID_RX_PIN 6
 #define RFID_TX_PIN 5
 
-/*/RFID VARIABLES/*/
-
-// RFID DATA FRAME FORMAT: 1byte head (value: 2), 10byte data (2byte version + 8byte tag), 2byte checksum, 1byte tail (value: 3)
-const int BUFFER_SIZE = 14;
-
-// RFID DATA FRAME FORMAT: 1byte head (AA=170), 10byte data (3byte fixed + 2byte country + 5byte tag), 1byte checksum, 1byte tail (BB=187)
-//const int BUFFER_SIZE = 13;
-// 10byte data (2byte version + 8byte tag)
-const int DATA_SIZE = 10;
-
- // 3 byte fixed (0F 08 00) + 7byte data (2byte country + 5byte tag) (03 84 + 12 DB FA E7 D5)
-//const int DATA_SIZE = 10;
- // 3byte fixed (0F 08 00)
-const int DATA_FIXED_SIZE = 3;
-
-// 2byte country (example 03 84)
-//const int DATA_COUNTRY_SIZE = 2;
-// 2byte version (actual meaning of these two bytes may vary)
-const int DATA_VERSION_SIZE = 2;
-
-// 8byte tag
-const int DATA_TAG_SIZE = 8;
-
-// 5byte tag (example 12 DB FA E7 D5)
-//const int DATA_TAG_SIZE = 5;
-// 2byte checksum
-const int CHECKSUM_SIZE = 2;
-
-// 1byte checksum (example 81)
-//const int CHECKSUM_SIZE = 1;
-
-//SoftwareSerial SerialRFID = SoftwareSerial(6,8); 
-// trigger switch, is true when rfid tag is detected in rfid loop function
+/******************************************************************************
+RFID variables
+******************************************************************************/
+// trigger switch, is true when rfid tag is detected in device
 bool rfid_detected;
 
 // used to store an incoming data frame 
 uint8_t rfid_tag_in_device[BUFFER_SIZE];
-int buffer_index = 0;
 
+// rfid tag stored in eeprom
 uint8_t stored_rfid_tag[BUFFER_SIZE];
-// used for reading from EEPROM to compare with tag being read in device
-uint8_t rfid_tag_data[DATA_TAG_SIZE];
 
 // is cat allowed to use the feeder?
 bool cat_allowed = false;
 
 bool cat_still_there = false
+
+/******************************************************************************
+EEPROM variables
+******************************************************************************/
+
+/*/
+Stores cat RFID tag numbers for each cat set to edvice
+press button 1 to register a cat
+from then on, the door will open for that cat
+/*/
+#define MAX_CATS_ALLOWABLE 2
+#define CATREGISTRYSTARTADDRESS 1
+#define REGISTRYSIZE = RDM6300_PACKET_SIZE * MAX_CATS_ALLOWABLE
 
 /******************************************************************************
 Opens the door to the cat food
@@ -132,15 +111,24 @@ void close_door(){
 }
 
 
-////////////////////////////////
-// EEPROM FUNCTIONS
-////////////////////////////////
+/******************************************************************************
+EEPROM FUNCTIONS
+******************************************************************************/
 uint8_t convertu32_to_u8(uint32_t number_to_convert){
 	uint8_t *arr;
 	//uint32_t Tx_PP= 0x02F003E7;
 	arr=(uint8_t*) &number_to_convert;
 	return &arr;
 	}
+
+/******************************************************************************
+zeros out the eeprom space reserved for the cat registry
+******************************************************************************/
+void clear_eeprom(){
+	for (index = 0, REGISTRYSIZE, index++){
+		EEPROM.write(index, 0);
+	}
+}
 /******************************************************************************
 SET a cat's RFID tag to the registry
 inputs:
@@ -323,7 +311,8 @@ void loop() {
 	if (rfid_detected){
         // print data for debugging
         Serial.println("RFID TAG INFO:");
-		Serial.println(rfid_tag_in_device, HEX);
+        // gets tag currently near device, regardless if run second time
+	    Serial.println(rfid_tag_in_device, HEX);
 
 		// checks if cat is allowed to use feeder
 		cat_allowed = check_cat();
