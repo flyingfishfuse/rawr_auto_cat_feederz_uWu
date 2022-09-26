@@ -1,4 +1,70 @@
 /******************************************************************************
+Pin Description
+******************************************************************************/
+/*
+For pin description of Arduino UNO, let us assume some basic numbering. Let
+the numbering begin with the RX Pin (D0). 
+	So, RX is Pin 1, 
+		TX is Pin 2, 
+		D2 is Pin 3 
+		and so on.
+
+On the other side, NC is Pin 19, IOREF is Pin 20 etc. 
+Overall, there are 32 pins on the Arduino UNO Board.
+
+IN CODE, the pinds use the "digital" number, 
+	i.e 
+		physical pin3 is digital pin 2, and you put THAT number in the code
+
+on my arduino UNO, the board is labled with the digital pin names
+and not the physical. So you use the pin numbers on the board in the code
+
+Pin Number			Pin Name		Description		Alternative Functions
+
+1 RX/D0		|	Digital IO Pin 0	Serial RX Pin Generally used as RX
+2 TX/D1		|	Digital IO Pin 1	Serial TX Pin Generally used as TX
+3 D2		|	Digital IO Pin 2	PWM
+4 D3		|	Digital IO Pin 3	Timer (OC2B)
+5 D4		|	Digital IO Pin 4	Timer (T0/XCK), PWM
+6 D5		|	Digital IO Pin 5	Timer (OC0B/T1), PWM
+7 D6		|	Digital IO Pin 6	
+8 D7		|	Digital IO Pin 7	
+9 D8		|	Digital IO Pin 8	Timer (CLK0/ICP1), PWM
+10 D9		|	Digital IO Pin 9	Timer (OC1A), PWM
+11 D10		|	Digital IO Pin 10	Timer (OC1B), PWM
+12 D11		|	Digital IO Pin 11	SPI (MOSI) Timer (OC2A)
+13 D12		|	Digital IO Pin 12	SPI (MISO)
+14 D13		|	Digital IO Pin 13	SPI (SCK)
+15 GND		|	Ground	
+16 AREF		|	Analog Reference	
+17 SDA/D18	|	Digital IO Pin 18	I2C Data Pin
+18 SCL/D19	|	Digital IO Pin 19	I2C Clock Pin
+19 NC		|	Not Connected	
+20 IOREF	|	Voltage Reference	
+21 RESET	|	Reset (Active LOW)	
+22 3V3		|	Power
+23 5V		|	+5V Output from regulator or +5V regulated Input	
+24 GND		|	Ground
+25 GND		|	Ground	
+26 VIN		|	Unregulated Supply
+27 A0		|	Analog Input 0	Digital IO Pin 14
+28 A1		|	Analog Input 1	Digital IO Pin 15
+29 A2		|	Analog Input 2	Digital IO Pin 16
+30 A3		|	Analog Input 3	Digital IO Pin 17
+31 A4		|	Analog Input 4	Digital IO Pin 18 I2C (SDA)
+32 A5		|	Analog Input 5	Digital IO Pin 19 I2C (SCL)
+
+The following table describes the pins of the ICSP Connector.
+
+MISO	Master In Slave Out (Input or Output)
+5V		Supply
+SCK		Clock (from Master to Slave)
+MOSI	Master Out Slave In (Input or Output)
+RESET 	Reset (Active LOW) 
+GND		Ground
+
+*/
+/******************************************************************************
 Imports
 ******************************************************************************/
 #include <Servo.h>
@@ -11,10 +77,10 @@ Imports
 Internal functionality
 ******************************************************************************/
 // change for debugging output, button is internal
-static bool DEBUG true
+bool DEBUG = true;
 
 // switch to check if its being run for the first time
-bool first_run true
+bool first_run = true;
 
 /******************************************************************************
 servo variables
@@ -42,14 +108,37 @@ PINOUT
 //	
 //	pins chosen for uno and nano
 
-#define ADDTOCATREGISTRYPIN 10
-#define CLEARCATREGISTRYPIN 9
-#define CAT_FLAP_SERVO_PIN 8
-#define FLAPOPENBUTTONPIN 7
-#define DEBUG_BUTTON 4
+// add cat to registry button, adds an rfid ID number to eeprom
+//Digital IO Pin 7
+#define ADDTOCATREGISTRYPIN 7
 
-#define RFID_RX_PIN 6
-#define RFID_TX_PIN 5
+//button pin, to clear registry data, resets stored rfid data to 0's
+//Digital IO Pin 6	
+#define CLEARCATREGISTRYPIN 6
+
+// servo PWM pin, for controlling the food door
+//Digital IO Pin 4 PWM
+#define CAT_FLAP_SERVO_PIN 4
+
+// Button pin, for opening and closing the food door
+//Digital IO Pin 8
+#define FLAPOPENBUTTONPIN 8
+
+// Button pin, this button will be inside the device, enables debugging
+// information to print to serial output and changes behavior for testing
+//Digital IO Pin 9
+#define DEBUG_BUTTON 9
+
+// RX (receive) pin for RFID, plug the TX wire into this, 
+// to *receive* the *transmitted* information
+//Digital IO Pin 0 Serial RX Pin Generally used as RX
+#define RFID_RX_PIN 1
+
+
+// TX (transmit) pin for RFID, plug the RX wire from the RFID into this 
+// to transmit information to the rfid module
+//Digital IO Pin 1 Serial TX Pin Generally used as TX
+#define RFID_TX_PIN 0
 
 /******************************************************************************
 RFID variables
@@ -58,15 +147,17 @@ RFID variables
 bool rfid_detected;
 
 // used to store an incoming data frame 
-uint8_t rfid_tag_in_device[BUFFER_SIZE];
+//uint8_t rfid_tag_in_device[BUFFER_SIZE];
+uint32_t rfid_tag_in_device;
 
 // rfid tag stored in eeprom
-uint8_t stored_rfid_tag[BUFFER_SIZE];
+//uint8_t stored_rfid_tag[BUFFER_SIZE];
+uint32_t stored_rfid_tag;
 
 // is cat allowed to use the feeder?
 bool cat_allowed = false;
 
-bool cat_still_there = false
+bool cat_still_there = false;
 
 /******************************************************************************
 EEPROM variables
@@ -79,7 +170,8 @@ from then on, the door will open for that cat
 /*/
 #define MAX_CATS_ALLOWABLE 2
 #define CATREGISTRYSTARTADDRESS 1
-#define REGISTRYSIZE = RDM6300_PACKET_SIZE * MAX_CATS_ALLOWABLE
+int asdf = sizeof(RDM6300_PACKET_SIZE) * MAX_CATS_ALLOWABLE;
+#define REGISTRYSIZE asdf
 
 /******************************************************************************
 Opens the door to the cat food
@@ -114,18 +206,27 @@ void close_door(){
 /******************************************************************************
 EEPROM FUNCTIONS
 ******************************************************************************/
-uint8_t convertu32_to_u8(uint32_t number_to_convert){
-	uint8_t *arr;
-	//uint32_t Tx_PP= 0x02F003E7;
-	arr=(uint8_t*) &number_to_convert;
-	return &arr;
+uint8_t convertu32_to_u8(uint32_t number_to_convert, int method){
+	if (method == 1){
+		uint8_t *arr;
+		//uint32_t Tx_PP= 0x02F003E7;
+		arr=(uint8_t*) &number_to_convert;
+		return &arr;
 	}
+	if (method == 2){
+		union {
+			unsigned long the_number;
+			unsigned char bytes[4];
+		} Converter;
+		Converter.the_number = number_to_convert;
+	}
+}
 
 /******************************************************************************
 zeros out the eeprom space reserved for the cat registry
 ******************************************************************************/
 void clear_eeprom(){
-	for (index = 0, REGISTRYSIZE, index++){
+	for (int index = 0; REGISTRYSIZE; index++){
 		EEPROM.write(index, 0);
 	}
 }
@@ -135,10 +236,12 @@ inputs:
 	int      | address
 	uint8_t  | byte array with rfid tag number
 ******************************************************************************/
-void WriteTagToRegistry(int address, uint8_t tag_data[]){//}, int arraySize) {
-	for (int i = 0; i < sizeof(tag_data); i++) {
-		EEPROM.write(address+i, tag_data[i]);
-	}
+//void WriteTagToRegistry(int address, uint8_t tag_data[]){//}, int arraySize) {
+void WriteTagToRegistry(int address, uint32_t tag_data){
+	//for (int i = 0; i < sizeof(tag_data); i++) {
+	//	EEPROM.write(address+i, tag_data[i]);
+	//}
+	EEPROM.put(address, tag_data);
 }
 
 /******************************************************************************
@@ -150,12 +253,14 @@ outputs:             |
                      |
 	uint8_t[] GLOBAL | byte array to hold stored data  
 ******************************************************************************/
-void ReadTagFromRegistry(int address){//, uint8_t rfid_tag_data[], int arraySize) {
+//void ReadTagFromRegistry(int address){//, uint8_t rfid_tag_data[], int arraySize) {
+void ReadTagFromRegistry(int address){
 	// read from specified adddress all the way until DATA_TAG_SIZE
-	for (int i = 0; i < sizeof(rfid_tag_in_device); i++) {
-		// store in global to validate against
-		stored_rfid_tag[i] = (uint8_t) EEPROM.read(address+i);
-	}
+	//for (int i = 0; i < sizeof(rfid_tag_in_device); i++) {
+	//	// store in global to validate against
+	//	stored_rfid_tag[i] = (uint8_t) EEPROM.read(address+i);
+	//}
+	stored_rfid_tag = (uint32_t) EEPROM.read(address);
 }
 
 /******************************************************************************
@@ -196,19 +301,10 @@ void clear_cat_registry(){
 }
 
 /******************************************************************************
-Extracts the tag data from the rfic chip in the dedtector field
+Pauses operation to allow the cat time to eat. Will check if the ID tag is 
+in the RFID receiver field , if it is, keeps door open.
+Otherwise, it closes the door.
 ******************************************************************************/
-void extract_tag() {
-	/* get_new_tag_id returns the tag_id of a "new" near tag,
-	following calls will return 0 as long as the same tag is kept near. */
-    //rfid_tag_in_device = rdm6300.get_new_tag_id();
-	if (DEBUG){
-		if (rfid_tag_in_device != 0){
-    		Serial.println("RFID TAG INFO:");
-	  		Serial.println(rdm6300.get_tag_id(), HEX);
-    	}
-	}
-}
 void wait_for_cat_to_finish(){
 	// TESTING CODE
 	if (DEBUG) {
@@ -221,23 +317,33 @@ void wait_for_cat_to_finish(){
 		// if cat no longer in field
 		if (rdm6300.get_tag_id() == 0){
 			//set trigger to let device know cat is not there
-			cat_still_there = false
+			// this kills the loop
+			//cat_still_there = false
+			break;
 		}
 		else{
-			delay(1000)
+			delay(1000);
 		}
 	}
+	// set the trigger to let device know cat is done
+	cat_still_there = false;
 }
+/******************************************************************************
+Operations to perform when turned on for the first time
+only use this if you have consistant power to the device. Once the power turns
+off, its goign to happen again and you will need to reset the cats
+******************************************************************************/
 void check_first_run(){
-	if first_run == true{
+	if (first_run == true) {
 		// wait 30 seconds for PIR to normalize
-		Serial.println("[+] Waiting 30 seconds for PIR to normalize")
-		delay(30000)
-		first_run = false
-		EEPROM.
+		//Serial.println("[+] Waiting 30 seconds for PIR to normalize")
+		// wait 10 seconds for modules to perform internal operations
+		delay(10000);
+		// set trigger to off
+		first_run = false;
+		// 0 out the eeprom to clear old tag info
+		clear_eeprom();
 	}
-
-
 }
 /******************************************************************************
 SETUP 
@@ -267,12 +373,12 @@ main loop
 ******************************************************************************/
 void loop() {
     // read rfid
-    //if (rdm6300._update()){
-		rfid_tag_in_device = convertu32_to_u8(rdm6300.get_tag_id());
-        //rfid_tag_in_device = rdm6300.get_tag_id();
-        // set trigger
-        rfid_detected = true;
-    //}
+	//rfid_tag_in_device = convertu32_to_u8(rdm6300.get_tag_id());
+	rfid_tag_in_device = rdm6300.get_tag_id();
+    // set trigger if device near
+    if (rfid_tag_in_device != 0) {
+		rfid_detected = true;
+    }
 	//read button states
 	// TODO: do something stupid if all buttons pressed,
 	// make led flash funny?
@@ -284,6 +390,10 @@ void loop() {
 	/*************************
 	BUTTON ACTIONS
 	**************************/
+	// if button to clear registry is pressed
+	if (clear_registry){
+		clear_cat_registry();
+	}
 	// if button to register cat is pressed
 	if (rfid_detected && add_to_registry == 1);{
 		set_cat(rfid_tag_in_device);
@@ -308,7 +418,7 @@ void loop() {
     // returns 0 if no tag near, or in second itteration
     //rfid_tag_in_device = rdm6300.get_new_tag_id()
     // tag is near device
-	if (rfid_detected){
+	if (rfid_detected) {
         // print data for debugging
         Serial.println("RFID TAG INFO:");
         // gets tag currently near device, regardless if run second time
@@ -322,7 +432,7 @@ void loop() {
 			open_door();
 			// set trigger to let device know cat is present
 			// cant let it get pinched!
-			cat_still_there = true
+			cat_still_there = true;
 			// wait until the cats rfid tag is no longer in the detection field
 			// of the rfid reader
 			// this function also closes the door
@@ -332,11 +442,7 @@ void loop() {
 		// fuck off asshole
 		else{
 			//continue;
-		}
-		
-	// something is wrong... start again looking for preamble (value: 2)
-	} else {
-		//return;
+		}		
 	}		
 }	
 
