@@ -19,26 +19,26 @@ IN CODE, the pinds use the "digital" number,
 on my arduino UNO, the board is labled with the digital pin names
 and not the physical. So you use the pin numbers on the board in the code
 
-Pin Number			Pin Name		Description		Alternative Functions
+Pin Number			Pin Name			Description		Alternative Functions
 
-1 RX/D0		|	Digital IO Pin 0	Serial RX Pin Generally used as RX
-2 TX/D1		|	Digital IO Pin 1	Serial TX Pin Generally used as TX
-3 D2		|	Digital IO Pin 2	PWM
-4 D3		|	Digital IO Pin 3	Timer (OC2B)
-5 D4		|	Digital IO Pin 4	Timer (T0/XCK), PWM
-6 D5		|	Digital IO Pin 5	Timer (OC0B/T1), PWM
-7 D6		|	Digital IO Pin 6	
-8 D7		|	Digital IO Pin 7	
-9 D8		|	Digital IO Pin 8	Timer (CLK0/ICP1), PWM
-10 D9		|	Digital IO Pin 9	Timer (OC1A), PWM
-11 D10		|	Digital IO Pin 10	Timer (OC1B), PWM
-12 D11		|	Digital IO Pin 11	SPI (MOSI) Timer (OC2A)
-13 D12		|	Digital IO Pin 12	SPI (MISO)
-14 D13		|	Digital IO Pin 13	SPI (SCK)
-15 GND		|	Ground	
-16 AREF		|	Analog Reference	
-17 SDA/D18	|	Digital IO Pin 18	I2C Data Pin
-18 SCL/D19	|	Digital IO Pin 19	I2C Clock Pin
+1 RX/D0		|	Digital IO Pin 0	|	Serial RX Pin Generally used as RX
+2 TX/D1		|	Digital IO Pin 1	|	Serial TX Pin Generally used as TX
+3 D2		|	Digital IO Pin 2	|	PWM
+4 D3		|	Digital IO Pin 3	|	Timer (OC2B)
+5 D4		|	Digital IO Pin 4	|	Timer (T0/XCK), PWM
+6 D5		|	Digital IO Pin 5	|	Timer (OC0B/T1), PWM
+7 D6		|	Digital IO Pin 6	|
+8 D7		|	Digital IO Pin 7	|
+9 D8		|	Digital IO Pin 8	|	Timer (CLK0/ICP1), PWM
+10 D9		|	Digital IO Pin 9	|	Timer (OC1A), PWM
+11 D10		|	Digital IO Pin 10	|	Timer (OC1B), PWM
+12 D11		|	Digital IO Pin 11	|	SPI (MOSI) Timer (OC2A)
+13 D12		|	Digital IO Pin 12	|	SPI (MISO)
+14 D13		|	Digital IO Pin 13	|	SPI (SCK)
+15 GND		|	Ground				|	
+16 AREF		|	Analog Reference	|
+17 SDA/D18	|	Digital IO Pin 18	|	I2C Data Pin
+18 SCL/D19	|	Digital IO Pin 19	|	I2C Clock Pin
 19 NC		|	Not Connected	
 20 IOREF	|	Voltage Reference	
 21 RESET	|	Reset (Active LOW)	
@@ -87,7 +87,6 @@ servo variables
 ******************************************************************************/
 // create servo object to control a servo
 Servo food_flap;
-Rdm6300 rdm6300;
 
 // variable to store the current servo position
 int current_position = 0;
@@ -143,11 +142,14 @@ PINOUT
 /******************************************************************************
 RFID variables
 ******************************************************************************/
+Rdm6300 rdm6300;
+
+int BUFFER_SIZE = 16
 // trigger switch, is true when rfid tag is detected in device
 bool rfid_detected;
 
 // used to store an incoming data frame 
-//uint8_t rfid_tag_in_device[BUFFER_SIZE];
+uint8_t rfid_tag_in_device_u8[BUFFER_SIZE];
 uint32_t rfid_tag_in_device;
 
 // rfid tag stored in eeprom
@@ -175,6 +177,8 @@ int asdf = sizeof(RDM6300_PACKET_SIZE) * MAX_CATS_ALLOWABLE;
 
 /******************************************************************************
 Opens the door to the cat food
+
+DONE
 ******************************************************************************/
 void open_door(){
 	// from fully closed, to fully open, do something while incrementing by one for every
@@ -190,6 +194,8 @@ void open_door(){
 
 /******************************************************************************
 Closes the door to the cat food
+
+DONE
 ******************************************************************************/
 void close_door(){
 		// from fully open, to fully closed, do something while incrementing by one
@@ -199,26 +205,6 @@ void close_door(){
 		food_flap.write(current_position);
 		// waits 15ms for the servo to reach the position
 		delay(15);
-	}
-}
-
-
-/******************************************************************************
-EEPROM FUNCTIONS
-******************************************************************************/
-uint8_t convertu32_to_u8(uint32_t number_to_convert, int method){
-	if (method == 1){
-		uint8_t *arr;
-		//uint32_t Tx_PP= 0x02F003E7;
-		arr=(uint8_t*) &number_to_convert;
-		return &arr;
-	}
-	if (method == 2){
-		union {
-			unsigned long the_number;
-			unsigned char bytes[4];
-		} Converter;
-		Converter.the_number = number_to_convert;
 	}
 }
 
@@ -235,6 +221,8 @@ SET a cat's RFID tag to the registry
 inputs:
 	int      | address
 	uint8_t  | byte array with rfid tag number
+
+DONE
 ******************************************************************************/
 //void WriteTagToRegistry(int address, uint8_t tag_data[]){//}, int arraySize) {
 void WriteTagToRegistry(int address, uint32_t tag_data){
@@ -262,23 +250,25 @@ void ReadTagFromRegistry(int address){
 	//}
 	stored_rfid_tag = (uint32_t) EEPROM.read(address);
 }
-
 /******************************************************************************
 Setter for cat registry
 modify this function to implement more cats allowed
+
+DONE
 ******************************************************************************/
-void set_cat(uint8_t tag_bytes[]){
+// uint32_t based code
+void set_cat_u32(uint32_t tag_bytes){
 	WriteTagToRegistry(CATREGISTRYSTARTADDRESS,tag_bytes);
 }
-
 /******************************************************************************
 Check if cat in scanner is allowed to access feeder
 Compares tag in device with tag stored in EEPROM
 sets tag data into global stored_rfid_tag
 ******************************************************************************/
-bool check_cat(){
+bool check_cat_u32(){
 	// sets stored_rfid_tag[] with tag number from EEPROM
-  	ReadTagFromRegistry(CATREGISTRYSTARTADDRESS);
+  	//ReadTagFromRegistry(CATREGISTRYSTARTADDRESS);
+	ReadTagFromRegistry(CATREGISTRYSTARTADDRESS);
 	// compare with tag being read in device
 	if (rfid_tag_in_device == stored_rfid_tag) {
 		Serial.println("[+] Stored tag matches tag in device");
@@ -304,6 +294,8 @@ void clear_cat_registry(){
 Pauses operation to allow the cat time to eat. Will check if the ID tag is 
 in the RFID receiver field , if it is, keeps door open.
 Otherwise, it closes the door.
+
+DONE
 ******************************************************************************/
 void wait_for_cat_to_finish(){
 	// TESTING CODE
@@ -318,15 +310,18 @@ void wait_for_cat_to_finish(){
 		if (rdm6300.get_tag_id() == 0){
 			//set trigger to let device know cat is not there
 			// this kills the loop
-			//cat_still_there = false
-			break;
+			cat_still_there = false
+			//break;
+			// wait 2 seconds
+			delay(2000)
+			close_door()
 		}
 		else{
 			delay(1000);
 		}
 	}
 	// set the trigger to let device know cat is done
-	cat_still_there = false;
+	//cat_still_there = false;
 }
 /******************************************************************************
 Operations to perform when turned on for the first time
@@ -336,7 +331,7 @@ off, its goign to happen again and you will need to reset the cats
 void check_first_run(){
 	if (first_run == true) {
 		// wait 30 seconds for PIR to normalize
-		//Serial.println("[+] Waiting 30 seconds for PIR to normalize")
+		//Serial.println("[+] Waiting 30 seconds for PIR to normali ze")
 		// wait 10 seconds for modules to perform internal operations
 		delay(10000);
 		// set trigger to off
@@ -365,41 +360,23 @@ void setup() {
 
     rdm6300.begin(RFID_RX_PIN);
 
-    Serial.println("[+] INIT DONE");
+    Serial.println("[+] INIT DONE"); 
 }
 
 /******************************************************************************
-main loop
+read button states
 ******************************************************************************/
-void loop() {
-    // read rfid
-	//rfid_tag_in_device = convertu32_to_u8(rdm6300.get_tag_id());
-	rfid_tag_in_device = rdm6300.get_tag_id();
-    // set trigger if device near
-    if (rfid_tag_in_device != 0) {
-		rfid_detected = true;
-    }
-	//read button states
+void read_buttons(){
 	// TODO: do something stupid if all buttons pressed,
 	// make led flash funny?
 	int add_to_registry = digitalRead(ADDTOCATREGISTRYPIN);
 	int clear_registry = digitalRead(CLEARCATREGISTRYPIN);
 	int actuate_door_button = digitalRead(FLAPOPENBUTTONPIN);
-	bool call_extract_tag = false;
-
-	/*************************
-	BUTTON ACTIONS
-	**************************/
-	// if button to clear registry is pressed
-	if (clear_registry){
-		clear_cat_registry();
-	}
-	// if button to register cat is pressed
-	if (rfid_detected && add_to_registry == 1);{
-		set_cat(rfid_tag_in_device);
-	}
-	// if button to change door position is pressed
-	if (actuate_door_button == 1){
+}
+/******************************************************************************
+Toggles door open or closed
+******************************************************************************/
+void actuate_door(){
 		// door is open, close door
 		if (DOOROPEN == true){
 		close_door();
@@ -410,6 +387,40 @@ void loop() {
 		open_door();
         DOOROPEN = true;
 		}
+	}
+/******************************************************************************
+main loop
+******************************************************************************/
+void loop() {
+    // read rfid
+	
+	// read button states to determine control flow
+	read_buttons()
+
+	bool call_extract_tag = false;
+
+	/*************************
+	BUTTON ACTIONS
+	**************************/
+	// if button to clear registry is pressed
+	if (clear_registry){
+		clear_cat_registry();
+	}
+	/*
+	*/
+	//get tag information from cat near device, returns uint32_t
+	rfid_tag_in_device = rdm6300.get_tag_id();
+	// set trigger if device near
+    if (rfid_tag_in_device != 0) {
+		rfid_detected = true;
+    }
+	// if button to register cat is pressed
+	if (rfid_detected && add_to_registry == 1);{
+		set_cat_u32(rfid_tag_in_device);
+	}
+	// if button to change door position is pressed
+	if (actuate_door_button == 1){
+		actuate_door()
 	}
 
 	/***************************
@@ -423,7 +434,6 @@ void loop() {
         Serial.println("RFID TAG INFO:");
         // gets tag currently near device, regardless if run second time
 	    Serial.println(rfid_tag_in_device, HEX);
-
 		// checks if cat is allowed to use feeder
 		cat_allowed = check_cat();
 		// cat IS allowed to use feeder
