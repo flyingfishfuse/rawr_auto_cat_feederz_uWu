@@ -145,16 +145,18 @@ RFID variables
 ******************************************************************************/
 Rdm6300 rdm6300;
 
-int BUFFER_SIZE = 16;
+// testing a modification, remove if necessary
+// this is to try and prevent too many EEPROM reads
+// stores tag from eeprom in memory on boot
+uint32_t registered_tag;
+
 // trigger switch, is true when rfid tag is detected in device
 bool rfid_detected;
 
 // used to store an incoming data frame 
-//uint8_t rfid_tag_in_device_u8[BUFFER_SIZE];
 uint32_t rfid_tag_in_device;
 
 // rfid tag stored in eeprom
-//uint8_t stored_rfid_tag[BUFFER_SIZE];
 uint32_t stored_rfid_tag;
 
 // is cat allowed to use the feeder?
@@ -170,6 +172,8 @@ EEPROM variables
 Stores cat RFID tag numbers for each cat set to edvice
 press button 1 to register a cat
 from then on, the door will open for that cat
+
+TODO: implement multiple cats, currently only one tag is stored
 /*/
 #define MAX_CATS_ALLOWABLE 2
 #define CATREGISTRYSTARTADDRESS 1
@@ -217,7 +221,64 @@ void close_door(){
 		delay(15);
 	}
 }
+/******************************************************************************
+Toggles door open or closed
+******************************************************************************/
+void actuate_door(){
+	Serial.println("Actuating door state");
+		// door is open, close door
+		if (DOOROPEN == true){
+			Serial.println("Door is open");
+			close_door();
+        	DOOROPEN = false;
+		}
+		// door is closed, open door
+		else if (DOOROPEN == false){
+			Serial.println("Door is closed");
+			open_door();
+        	DOOROPEN = true;
+		}
+	}
+/******************************************************************************
+Set pin modes for setup
+******************************************************************************/
+void set_pins(){
+	pinMode(ADDTOCATREGISTRYPIN, INPUT_PULLUP);
+	pinMode(CLEARCATREGISTRYPIN, INPUT_PULLUP);
+	pinMode(FLAPOPENBUTTONPIN, INPUT_PULLUP);
 
+}
+/******************************************************************************
+read button states
+******************************************************************************/
+void read_buttons(){
+	// TODO: do something stupid if all buttons pressed,
+	// make led flash funny?
+	add_to_registry = digitalRead(ADDTOCATREGISTRYPIN);
+	clear_registry = digitalRead(CLEARCATREGISTRYPIN);
+	actuate_door_button = digitalRead(FLAPOPENBUTTONPIN);
+}
+
+/******************************************************************************
+Actions taken on button presses
+******************************************************************************/
+void button_actions(){
+	if (clear_registry == 1){
+		Serial.println("Clear registry button pressed");
+		clear_cat_registry();
+	}
+	
+	// if button to register cat is pressed
+	if (add_to_registry == 1 && rfid_detected == true){
+		Serial.println("Add to registry button pressed");
+    	set_cat(rfid_tag_in_device);
+	}
+	// if button to change door position is pressed
+	if (actuate_door_button == 1){
+		Serial.println("Actuate door button pressed");
+		actuate_door();
+	}
+}
 /******************************************************************************
 zeros out the eeprom space reserved for the cat registry
 ******************************************************************************/
@@ -264,7 +325,8 @@ outputs:             |
 	uint8_t[] GLOBAL | byte array to hold stored data  
 ******************************************************************************/
 //void ReadTagFromRegistry(int address){//, uint8_t rfid_tag_data[], int arraySize) {
-void ReadTagFromRegistry(int address){
+//void ReadTagFromRegistry(int address){
+uint32_t ReadTagFromRegistry(int address){
 	Serial.println("Reading tag from registry");
 	// read from specified adddress all the way until DATA_TAG_SIZE
 	//for (int i = 0; i < sizeof(rfid_tag_in_device); i++) {
@@ -276,8 +338,20 @@ void ReadTagFromRegistry(int address){
 	}
 	else {
 		stored_rfid_tag = (uint32_t) EEPROM.read(address);
+		return stored_rfid_tag;
 	}
 }
+/******************************************************************************
+Clear the registry of all registered cat RFID tags
+******************************************************************************/
+void clear_cat_registry(){
+	Serial.println("Clearing registry");
+	// itterates over entire address space allocated to cat registry
+	for (int registry_index = CATREGISTRYSTARTADDRESS ; registry_index < MAX_CATS_ALLOWABLE ; registry_index++){
+		EEPROM.write(registry_index, 0);
+	}
+}
+
 /******************************************************************************
 Setter for cat registry
 modify this function to implement more cats allowed
@@ -292,149 +366,36 @@ void set_cat(uint32_t tag_bytes){
 /******************************************************************************
 Check if cat in scanner is allowed to access feeder
 Compares tag in device with tag stored in EEPROM
-sets tag data into global stored_rfid_tag
+
+MOVED: sets tag data into global stored_rfid_tag
+		moved to setup()
 ******************************************************************************/
-bool check_cat(){
+bool check_cat(uint32_t tag_to_check){
 	Serial.println("Checking cat authorization");
 	// sets stored_rfid_tag[] with tag number from EEPROM
   	//ReadTagFromRegistry(CATREGISTRYSTARTADDRESS);
-	ReadTagFromRegistry(CATREGISTRYSTARTADDRESS);
+	//registered_tag = ReadTagFromRegistry(CATREGISTRYSTARTADDRESS);
+
+	// stored tag data is already loaded into memory from eeprom
 	// compare with tag being read in device
-	if (rfid_tag_in_device == stored_rfid_tag) {
+	if (rfid_tag_in_device == registered_tag) {
 		Serial.println("[+] Stored tag matches tag in device");
 		return true;
 	}
-	if (rfid_tag_in_device != stored_rfid_tag){
-		Serial.println("[+] Stored tag matches tag in device");
+	if (rfid_tag_in_device != registered_tag){
+		Serial.println("[-] Stored tag does not match tag in device");
 		return false;
 	}
 }
 
 /******************************************************************************
-Clear the registry of all registered cat RFID tags
-******************************************************************************/
-void clear_cat_registry(){
-	Serial.println("Clearing registry");
-	// itterates over entire address space allocated to cat registry
-	for (int registry_index = CATREGISTRYSTARTADDRESS ; registry_index < MAX_CATS_ALLOWABLE ; registry_index++){
-		EEPROM.write(registry_index, 0);
-	}
-}
-
-/******************************************************************************
-Pauses operation to allow the cat time to eat. Will check if the ID tag is 
-in the RFID receiver field , if it is, keeps door open.
-Otherwise, it closes the door.
-
-DONE
-******************************************************************************/
-void wait_for_cat_to_finish(){
-	Serial.println("Waiting for cat to finish");
-	// TESTING CODE
-	if (DEBUG) {
-		// wait 5 seconds
-	 	delay(5000);
-		Serial.println("[+] DEBUG: pretending cat is finished");
-	}
-	// while the cat is still there
-	while (cat_still_there){
-		// if cat no longer in field
-		if (rdm6300.get_tag_id() == 0){
-			//set trigger to let device know cat is not there
-			// this kills the loop
-			cat_still_there = false;
-			//break;
-			// wait 2 seconds
-			delay(2000);
-			close_door();
-		}
-		else{
-			delay(1000);
-		}
-	}
-	// set the trigger to let device know cat is done
-	//cat_still_there = false;
-}
-/******************************************************************************
-Operations to perform when turned on for the first time
-only use this if you have consistant power to the device. Once the power turns
-off, its goign to happen again and you will need to reset the cats
-******************************************************************************/
-void check_first_run(){
-	if (first_run == true) {
-		// wait 30 seconds for PIR to normalize
-		//Serial.println("[+] Waiting 30 seconds for PIR to normali ze")
-		// wait 10 seconds for modules to perform internal operations
-		delay(10000);
-		// set trigger to off
-		first_run = false;
-		// 0 out the eeprom to clear old tag info
-		//clear_eeprom();
-	}
-}
-
-/******************************************************************************
-Set pin modes for setup
-******************************************************************************/
-void set_pins(){
-	pinMode(ADDTOCATREGISTRYPIN, INPUT_PULLUP);
-	pinMode(CLEARCATREGISTRYPIN, INPUT_PULLUP);
-	pinMode(FLAPOPENBUTTONPIN, INPUT_PULLUP);
-
-}
-/******************************************************************************
-read button states
-******************************************************************************/
-void read_buttons(){
-	// TODO: do something stupid if all buttons pressed,
-	// make led flash funny?
-	add_to_registry = digitalRead(ADDTOCATREGISTRYPIN);
-	clear_registry = digitalRead(CLEARCATREGISTRYPIN);
-	actuate_door_button = digitalRead(FLAPOPENBUTTONPIN);
-}
-
-/******************************************************************************
-Actions taken on button presses
-******************************************************************************/
-void button_actions(){
-	if (clear_registry == 1){
-		clear_cat_registry();
-		Serial.println("Clear registry button pressed");
-	}
-	
-	// if button to register cat is pressed
-	if (add_to_registry == 1 && rfid_detected == true){
-		set_cat(rfid_tag_in_device);
-		Serial.println("Add to registry button pressed");
-	}
-	// if button to change door position is pressed
-	if (actuate_door_button == 1){
-		Serial.println("Actuate door button pressed");
-		actuate_door();
-	}
-}
-/******************************************************************************
-Toggles door open or closed
-******************************************************************************/
-void actuate_door(){
-	Serial.println("Actuating door state");
-		// door is open, close door
-		if (DOOROPEN == true){
-			Serial.println("Door is open");
-			close_door();
-        	DOOROPEN = false;
-		}
-		// door is closed, open door
-		else if (DOOROPEN == false){
-			Serial.println("Door is closed");
-			open_door();
-        	DOOROPEN = true;
-		}
-	}
-/******************************************************************************
 RFID field observation code
+	Checks for tag in field area
+	if tag in field, stores tag data for later validation
+	Sets rfid_detected to true
 ******************************************************************************/
 void check_rfid(){
+
 	// returns 0 if no tag near, or in second itteration
     //rfid_tag_in_device = rdm6300.get_new_tag_id()
 
@@ -442,30 +403,50 @@ void check_rfid(){
 	rfid_tag_in_device = rdm6300.get_tag_id();
 	// set trigger if device near
     if (rfid_tag_in_device != 0) {
+		Serial.println("RFID TAG INFO:");
+    	Serial.println(rfid_tag_in_device,HEX);      
 		rfid_detected = true;
     }
+	// remove trigger if tag not in field
+	// if another cat is there, tag will not match check_cat()
+	if (rfid_tag_in_device = 0) {
+		rfid_detected = false;
+	}
 }
 /******************************************************************************
-RFID behaviors, actions to undertake on tag in field
+RFID behaviors, actions to undertake when tag in field
 ******************************************************************************/
-void RFID_actions(){
-	        // print data for debugging
-        Serial.println("RFID TAG INFO:");
-        // gets tag currently near device, regardless if run second time
-	    Serial.println(rfid_tag_in_device, HEX);
+void rfid_actions(){
 		// checks if cat is allowed to use feeder
-		cat_allowed = check_cat();
+		cat_allowed = check_cat(rfid_tag_in_device);
 		// cat IS allowed to use feeder
 		if (cat_allowed){
-			// open the door
 			open_door();
 			// set trigger to let device know cat is present
-			// cant let it get pinched!
 			cat_still_there = true;
 			// wait until the cats rfid tag is no longer in the detection field
-			// of the rfid reader
-			// this function also closes the door
-			wait_for_cat_to_finish();
+			//wait_for_cat_to_finish();
+		}
+		// this previously was a seperate function
+		//void wait_for_cat_to_finish()
+		while (cat_still_there){
+		// check if tag still present
+			check_rfid();
+
+			// if it isnt, close the door
+			// and set trigger to let device know cat is not there
+			if (rfid_detected == false){
+				//cat_still_there = false;
+				close_door();
+				break;
+			}
+
+			// tag still in rfid field
+			if (rfid_detected) {
+				// wait a second and check again
+				delay(1000);
+			}
+		}
 }
 /******************************************************************************
 SETUP 
@@ -475,7 +456,13 @@ void setup() {
 	food_flap.attach(CAT_FLAP_SERVO_PIN);
     Serial.begin(9600); 
     rdm6300.begin(RFID_RX_PIN);
-    Serial.println("[+] INIT DONE"); 
+    Serial.println("[+] INIT DONE");
+
+	// the chances of a cat having the rfid 
+	// data match whats there from the factory is super low.
+	// you MUST set a cat tag using button 2 before the door will open
+	registered_tag = ReadTagFromRegistry(CATREGISTRYSTARTADDRESS);
+	
 }
 /******************************************************************************
 main loop
@@ -494,19 +481,18 @@ void loop() {
 	/*************************
 	BUTTON ACTIONS
 	**************************/
-	button_actions()
+	button_actions();
 
 	/***************************
 	RFID DETECTION AND BEHAVIOR
 	***************************/
     // tag is near device
 	if (rfid_detected) {
-		RFID_actions()
+		rfid_actions();
 		}
 		// cat IS NOT allowed to use feeder
 		else{
 			//continue;
-		}		
-	}		
+		}			
 }	
 
