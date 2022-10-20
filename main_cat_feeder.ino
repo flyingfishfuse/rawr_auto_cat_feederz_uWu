@@ -284,14 +284,14 @@ zeros out the eeprom space reserved for the cat registry
 ******************************************************************************/
 void clear_eeprom(){
 	Serial.println("Clearing eeprom space");
-	if (DEBUG == true){
-		Serial.println("Pretending to clear EEPROM");
-	}
-	else {
+	//if (DEBUG == true){
+	//	Serial.println("Pretending to clear EEPROM");
+	//}
+	//else {
 		for (int index = 0; REGISTRYSIZE; index++){
 			EEPROM.write(index, 0);
 		}
-	}
+	//}
 }
 /******************************************************************************
 SET a cat's RFID tag to the registry
@@ -306,13 +306,13 @@ void WriteTagToRegistry(int address, uint32_t tag_data){
 	//for (int i = 0; i < sizeof(tag_data); i++) {
 	//	EEPROM.write(address+i, tag_data[i]);
 	//}
-	if (DEBUG == true){
-		Serial.println("Pretending to Write RFID tag information to EEPROM");
-	}
-	else {
+	//if (DEBUG == true){
+	//	Serial.println("Pretending to Write RFID tag information to EEPROM");
+	//}
+	//else {
 		Serial.println("Writing tag to registry");
 		EEPROM.put(address, tag_data);
-	}
+	//}
 }
 
 /******************************************************************************
@@ -333,13 +333,13 @@ uint32_t ReadTagFromRegistry(int address){
 	//	// store in global to validate against
 	//	stored_rfid_tag[i] = (uint8_t) EEPROM.read(address+i);
 	//}
-	if (DEBUG == true){
-		Serial.println("Pretending to Read RFID tag information from EEPROM");
-	}
-	else {
+	//if (DEBUG == true){
+	//	Serial.println("Pretending to Read RFID tag information from EEPROM");
+	//}
+	//else {
 		stored_rfid_tag = (uint32_t) EEPROM.read(address);
 		return stored_rfid_tag;
-	}
+	//}
 }
 /******************************************************************************
 Clear the registry of all registered cat RFID tags
