@@ -158,10 +158,12 @@ void read_rotary_input(){
 
 		}
 
-		Serial.print("Direction: ");
-		Serial.print(EncoderDirection);
-		Serial.print(" | EncoderClickCount: ");
+		Serial.print("[+] Direction: ");
+		Serial.println(EncoderDirection);
+		Serial.print("[+] EncoderClickCount: ");
 		Serial.println(EncoderClickCount);
+    Serial.print("[+] New Value for speed/timer function")
+    Serial.println(ValueToSetWhenSetButtonPressed)
 
 	}
   	// Remember last CLK state
@@ -201,7 +203,8 @@ void ChangeEncoderFunction(){
 Controls the speed of the motor for precise control of start and stop position
 as controlled by the potentiometer or other variable input mechanism
 ******************************************************************************/
-void read_speed_input(){
+/*
+void read_encoder_input(){
   speed = analogRead(speed_control_pin)
   
 	Serial.print("Speed Direction: ");
@@ -209,14 +212,14 @@ void read_speed_input(){
 	Serial.print(" | EncoderClickCount: ");
 	Serial.println(EncoderClickCount);
 }
-
+*/
 /******************************************************************************
 Controls the spin time of the motor for precise control of start and stop 
 position
 ******************************************************************************/
-void change_spin_time(){
+//void change_spin_time(){
 
-}
+//}
 /******************************************************************************
 Read the input for actuating the cylinder
 ******************************************************************************/
@@ -246,7 +249,7 @@ void read_clean_input(){
 
 /******************************************************************************
 Controls the timing of the motor so it spins for a specified amount of time
-as controlled by the potentiometer or other input mechanism
+as controlled by the encoder knob
 
 -------!!! IMPORTANT !!!-------
 USE THIS IN PLACE OF REGULAR delay() function!!!
@@ -254,8 +257,13 @@ USE THIS IN PLACE OF REGULAR delay() function!!!
 
 ******************************************************************************/
 void wait_for_motor_to_spin(){
-  //read_timer_input()
-  //delay(timerval * 10);
+  // millies() holds a number of milliseconds since the board was powered on
+  unsigned long CurrentMillis = millis();
+  // if the current time is equal to or greater than the time interval then it must spin
+  if (CurrentMillis - SpinTime >= SpinInterval) {
+    // save the last time you removed poopies
+     = currentMillis;
+  }
 }
 
 /******************************************************************************
@@ -354,7 +362,7 @@ void loop() {
   unsigned long CurrentMillis = millis();
   // if the current time is equal to or greater than the time interval then it must spin
   if (currentMillis - PeviousMotorActivation >= SpinInterval) {
-    // save the last time you blinked the LED
+    // save the last time you removed poopies
     PeviousMotorActivation = currentMillis;
     clean_da_poopie();
   }
