@@ -75,6 +75,10 @@ int ValueToSetWhenSetButtonPressed = SpeedValue;
 // DEFAULT is 250 seconds
 int SpinTime = 150000;
 
+// Variable to store the start time of PWM
+unsigned long startTime;
+// Flag to indicate if PWM is running
+boolean pwmRunning = false;
 /******************************************************************************
 Rotary Encoder Inputs and variables
 ******************************************************************************/
@@ -97,7 +101,7 @@ int currentStateCLK;
 int lastStateCLK;
 String EncoderDirection ="";
 unsigned long lastButtonPress = 0;
-#define rotary_function_pin rotary_function_pin;
+//#define rotary_function_pin ;
 int EncoderButtonState;
 String EncoderCurrentFunction = "";
 // 1 = speed control
@@ -123,11 +127,12 @@ int cleanbuttonState = 0;
 // EncoderClickCount for the number of button presses
 int cleanbuttonPushEncoderClickCount = 0;
 // previous state of the button
-int cleanlastButtonState = 0;
+int lastcleanButtonState = 0;
 
 int emergencyStopContinue = 11;
 // when pressed, will enable use of rotary encoder
-int useEncoder = 13;
+int useEncoderButton = 13;
+int useEncoderButtonState;
 // when pressed, will change function of encoder
 //int RotaryButton = 
 
@@ -162,8 +167,8 @@ void read_rotary_input(){
 		Serial.println(EncoderDirection);
 		Serial.print("[+] EncoderClickCount: ");
 		Serial.println(EncoderClickCount);
-    Serial.print("[+] New Value for speed/timer function")
-    Serial.println(ValueToSetWhenSetButtonPressed)
+    Serial.print("[+] New Value for speed/timer function");
+    Serial.println(ValueToSetWhenSetButtonPressed);
 
 	}
   	// Remember last CLK state
@@ -184,12 +189,16 @@ void ChangeEncoderFunction(){
         EncoderCurrentFunction = "Timing";
         ValueToSetWhenSetButtonPressed = SpinTime;
         Serial.println("Encoder Function Changed To TIMING");
+        Serial.println("Current Value:");
+        Serial.println(ValueToSetWhenSetButtonPressed);
       }
       else if (EncoderState == 0){
         EncoderState = 1;
         EncoderCurrentFunction = "Speed";
         ValueToSetWhenSetButtonPressed = SpeedValue;
         Serial.println("Encoder Function Changed To SPEED");
+        Serial.println("Current Value:");
+        Serial.println(ValueToSetWhenSetButtonPressed);
       }
 		}
 		// Remember last button press event
@@ -199,37 +208,20 @@ void ChangeEncoderFunction(){
 	delay(1000);
 
 }
-/******************************************************************************
-Controls the speed of the motor for precise control of start and stop position
-as controlled by the potentiometer or other variable input mechanism
-******************************************************************************/
-/*
-void read_encoder_input(){
-  speed = analogRead(speed_control_pin)
-  
-	Serial.print("Speed Direction: ");
-	Serial.print(EncoderDirection);
-	Serial.print(" | EncoderClickCount: ");
-	Serial.println(EncoderClickCount);
-}
-*/
-/******************************************************************************
-Controls the spin time of the motor for precise control of start and stop 
-position
-******************************************************************************/
-//void change_spin_time(){
 
-//}
 /******************************************************************************
 Read the input for actuating the cylinder
 ******************************************************************************/
+/*
 void read_clean_input(){
   // read the pushbutton input pin:
   cleanbuttonState = digitalRead(cleanbuttonPin);
+  // Delay a little bit to avoid bouncing
+  delay(50);
       // compare the buttonState to its previous state
-  if (buttonState != lastButtonState) {
+  if (cleanbuttonState != lastcleanButtonState) {
     // if the state has changed, increment the EncoderClickCount
-    if (buttonState == LOW) {
+    if (cleanbuttonState == LOW) {
       // if the current state is LOW then the button went from off to on:
       Serial.println("on");
 
@@ -239,41 +231,22 @@ void read_clean_input(){
       // if the current state is HIGH then the button went from on to off:
       Serial.println("off");
     }
-    // Delay a little bit to avoid bouncing
-    delay(50);
+
   }
   // save the current state as the last state, for next time through the loop
-  lastButtonState = buttonState;
+  lastcleanButtonState = cleanbuttonState;
   delay(1000);
 }
-
-/******************************************************************************
-Controls the timing of the motor so it spins for a specified amount of time
-as controlled by the encoder knob
-
--------!!! IMPORTANT !!!-------
-USE THIS IN PLACE OF REGULAR delay() function!!!
--------!!! IMPORTANT !!!-------
-
-******************************************************************************/
-void wait_for_motor_to_spin(){
-  // millies() holds a number of milliseconds since the board was powered on
-  unsigned long CurrentMillis = millis();
-  // if the current time is equal to or greater than the time interval then it must spin
-  if (CurrentMillis - SpinTime >= SpinInterval) {
-    // save the last time you removed poopies
-     = currentMillis;
-  }
-}
+*/
 
 /******************************************************************************
 Drives the motor in the forward direction, to separate the sand and poop
 The poop will fall into a hole that leads to a poop holder lines with a bag
 ******************************************************************************/
 void motor_forward(){
-  Serial.println("Starting motor: FORWARD")
+  Serial.println("Starting motor: FORWARD");
   motorController.Enable();
-
+  motorController.TurnRight(SpeedValue);
   stop_motor();
 }
 
@@ -284,7 +257,7 @@ to allow the sand to pour out of the separation chamber into the poop area
 void motor_reverse(){
   Serial.println("Starting motor: BACKWARD");
   motorController.Enable();
-  motorController.TurnLeft(speed);
+  motorController.TurnLeft(SpeedValue);
   stop_motor();
 }
 
@@ -299,17 +272,45 @@ void stop_motor(){
 
 /******************************************************************************
 Run the main feature of the litter box when the button is pressed
+yes I know I am repeating code, I am sick and cannot think right now
 ******************************************************************************/
-void clean_da_poopie(){
-  // roll forward;
-  motor_forward();
-  // wait
-  wait_for_motor_to_spin();
-  // roll back into place
-  motor_reverse();
+void clean(){
+  unsigned long startTime = millis();
+  // Set the flag to indicate PWM is running
+  pwmRunning = true;
+  // roll forward to empty poop and seive sand
+  while (pwmRunning && (millis() - startTime) < SpinTime) {
+     //analogWrite(pwmPin, 128);
+     motor_forward();
+    // Check if the button is pressed to stop the PWM
+    if (digitalRead(emergencyStopContinue) == LOW) {
+      pwmRunning = false;  // Set the flag to stop PWM
+      break;  // Exit the loop
+    }
+  }
   //stop motor!
   stop_motor();
+  pwmRunning = false;
+
+  // Set the flag to indicate PWM is running
+  pwmRunning = true;
+  // roll back into place
+  while (pwmRunning && (millis() - startTime) < SpinTime) {
+  //if (millis() - startTime < SpinTime) {
+     //analogWrite(pwmPin, 128);
+    motor_reverse();
+    // Check if the button is pressed to stop the PWM
+    if (digitalRead(emergencyStopContinue) == LOW) {
+      pwmRunning = false;  // Set the flag to stop PWM
+      break;  // Exit the loop
+    }
+
+  //stop motor!
+  stop_motor();
+  pwmRunning = false;
 }
+}
+
 void setup() {
   // initialize the input pins:
   // clean action
@@ -317,7 +318,7 @@ void setup() {
   // emergency stop / continue
   pinMode(emergencyStopContinue, INPUT_PULLUP);
   // when pressed, activates usage of encoder pin
-  //pinMode(useEncoder, INPUT_PULLUP);
+  pinMode(useEncoderButton, INPUT_PULLUP);
 
   // rotary encoder
  	pinMode(CLK,INPUT);
@@ -334,22 +335,46 @@ void setup() {
 }
 
 void loop() {
-///////////////////////////////////////////////////////////////////////////////
-  // Read the encoder button state
-  EncoderButtonState = digitalRead(rotary_function_pin);
-  //If we detect LOW signal, button is pressed
-	if (EncoderButtonState == LOW) {
-    // toggle function of rotary encoder to control either speed or timing
-    ChangeEncoderFunction();
+  // if the user is pressing the button to use the encoder knob
+  useEncoderButtonState = digitalRead(useEncoderButton);
+  // debounce
+  delay(100);
+  // while that button is pressed
+  while (useEncoderButtonState == LOW){
+    // Read the encoder button state
+    EncoderButtonState = digitalRead(rotary_function_pin);
+    //If we detect LOW signal, button is pressed
+	  if (EncoderButtonState == LOW) {
+      // toggle function of rotary encoder to control either speed or timing
+      ChangeEncoderFunction();
+      // debounce
+      delay(100);
+    }
+    // now we read rotary control input to dial in proper speed and timing
+    read_rotary_input();
   }
-
-  // now we read rotary control input to dial in proper speed and timing
-  read_rotary_input();
-
-///////////////////////////////////////////////////////////////////////////////
+/*
+================================================================================
+ Both the actions performed below perform the same function of rolling the 
+ cylinder, one is manual, the other is automatic
+================================================================================
+*/
 // MANUAL CLEANING
+
   // is this button is pressed, the user wants to clean da poopie without waiting
-  read_clean_input();
+  //read_clean_input();
+    // read the pushbutton input pin:
+  cleanbuttonState = digitalRead(cleanbuttonPin);
+  // Delay a little bit to avoid bouncing
+  delay(50);
+      // compare the buttonState to its previous state
+  if (cleanbuttonState == LOW && !pwmRunning){ // != lastcleanButtonState) {
+      // clean the litter! 
+      clean();
+    }
+  // save the current state as the last state, for next time through the loop
+  lastcleanButtonState = cleanbuttonState;
+  delay(100);
 
 ///////////////////////////////////////////////////////////////////////////////
 // AUTOMATIC CLEANING ACTUATION BASED ON TIMING
@@ -361,10 +386,10 @@ void loop() {
   // millies() holds a number of milliseconds since the board was powered on
   unsigned long CurrentMillis = millis();
   // if the current time is equal to or greater than the time interval then it must spin
-  if (currentMillis - PeviousMotorActivation >= SpinInterval) {
+  if (CurrentMillis - PeviousMotorActivation >= SpinInterval) {
     // save the last time you removed poopies
-    PeviousMotorActivation = currentMillis;
-    clean_da_poopie();
+    PeviousMotorActivation = CurrentMillis;
+    clean();
   }
   // basic functions for motor
   //motorController.Enable();
