@@ -66,7 +66,9 @@ long SpinInterval = 30000000;  // 8.3333333 hours
 // value for motor speed
 int SpeedValue = 100;
 
-int ValueToSetWhenSetButtonPressed = SpeedValue;
+//int ValueToSetWhenSetButtonPressed = SpeedValue;
+int SpeedValueToSetWhenSetButtonPressed;
+int SpinTimeValueToSetWhenSetButtonPressed;
 // this is necessary because we need to allow for different motors and drums
 // as well as different drive trains which all determine the time nececssary to
 // complete the full spin cycle of the motor and drum to fully clean and replace
@@ -103,6 +105,7 @@ String EncoderDirection ="";
 unsigned long lastButtonPress = 0;
 //#define rotary_function_pin ;
 int EncoderButtonState;
+int useEncoderButtonPressed;
 String EncoderCurrentFunction = "";
 // 1 = speed control
 // 0 = timing control
@@ -146,30 +149,54 @@ void read_rotary_input(){
 	// If last and current state of CLK are different, then pulse occurred
 	// React to only 1 state change to avoid double count
 	if (currentStateCLK != lastStateCLK  && currentStateCLK == 1){
+    // ENCODER STATE
+    // 1 = speed control
+    // 0 = timing control
 
-		// If the DT state is different than the CLK state then
-		// the encoder is rotating CCW so decrement
-		if (digitalRead(DT) != currentStateCLK) {
-			EncoderClickCount --;
-			EncoderDirection ="CCW";
-      // decrease the value of the encoder function
-      ValueToSetWhenSetButtonPressed = ValueToSetWhenSetButtonPressed - EncoderClickCount;
-		} else {
-			// Encoder is rotating CW so increment
-			EncoderClickCount ++;
-			EncoderDirection ="CW";
-      // increase the value of the encoder function
-      ValueToSetWhenSetButtonPressed = ValueToSetWhenSetButtonPressed + EncoderClickCount;
-
-		}
-
-		Serial.print("[+] Direction: ");
+    // encoder state is speed control
+    if (EncoderState == 1 ){
+		  // If the DT state is different than the CLK state then
+		  // the encoder is rotating CCW so decrement
+		  if (digitalRead(DT) != currentStateCLK) {
+	  		EncoderClickCount --;
+			  EncoderDirection ="CCW";
+        // decrease the value of the encoder function
+        SpeedValueToSetWhenSetButtonPressed = SpeedValueToSetWhenSetButtonPressed - EncoderClickCount;
+  		} else {
+  			// Encoder is rotating CW so increment
+			  EncoderClickCount ++;
+			  EncoderDirection ="CW";
+        // increase the value of the encoder function
+        SpeedValueToSetWhenSetButtonPressed = SpeedValueToSetWhenSetButtonPressed + EncoderClickCount;
+  		}
+      Serial.print("[+] Direction: ");
+  		Serial.println(EncoderDirection);
+		  Serial.print("[+] EncoderClickCount: ");
+		  Serial.println(EncoderClickCount);
+      Serial.print("[+] New Value for speed/timer function: ");
+      Serial.println(SpeedValueToSetWhenSetButtonPressed);
+    }
+    // encoder state is timing control
+    else if (EncoderState == 0 ){
+      if (digitalRead(DT) != currentStateCLK) {
+			  EncoderClickCount --;
+			  EncoderDirection ="CCW";
+        // decrease the value of the encoder function
+        SpinTimeValueToSetWhenSetButtonPressed = SpinTimeValueToSetWhenSetButtonPressed - EncoderClickCount;
+		  } else {
+			  // Encoder is rotating CW so increment
+			  EncoderClickCount ++;
+			  EncoderDirection ="CW";
+        // increase the value of the encoder function
+        SpinTimeValueToSetWhenSetButtonPressed = SpinTimeValueToSetWhenSetButtonPressed + EncoderClickCount;
+		  }
+    Serial.print("[+] Direction: ");
 		Serial.println(EncoderDirection);
 		Serial.print("[+] EncoderClickCount: ");
 		Serial.println(EncoderClickCount);
-    Serial.print("[+] New Value for speed/timer function");
-    Serial.println(ValueToSetWhenSetButtonPressed);
-
+    Serial.print("[+] New Value for speed/timer function: ");
+    Serial.println(SpinTimeValueToSetWhenSetButtonPressed);
+    }
 	}
   	// Remember last CLK state
 	lastStateCLK = currentStateCLK;
@@ -182,25 +209,27 @@ control either speed of rotation, or timing of unit activation
 void ChangeEncoderFunction(){
 		//if 50ms have passed since last LOW pulse, it means that the
 		//button has been pressed, released and pressed again
-		if (millis() - lastButtonPress > 50) {
-			Serial.println("Encoder Button pressed! \n Changing function of encoder!");
+		//if (millis() - lastButtonPress > 50) {
+		Serial.println("Encoder Button pressed! \n Changing function of encoder!");
       if (EncoderState == 1){
         EncoderState = 0;
         EncoderCurrentFunction = "Timing";
-        ValueToSetWhenSetButtonPressed = SpinTime;
+        //ValueToSetWhenSetButtonPressed = SpinTime;
+        //SpinTimeValueToSetWhenSetButtonPressed = SpinTime;
         Serial.println("Encoder Function Changed To TIMING");
         Serial.println("Current Value:");
-        Serial.println(ValueToSetWhenSetButtonPressed);
+        Serial.println(SpinTimeValueToSetWhenSetButtonPressed);
       }
       else if (EncoderState == 0){
         EncoderState = 1;
         EncoderCurrentFunction = "Speed";
-        ValueToSetWhenSetButtonPressed = SpeedValue;
+        //ValueToSetWhenSetButtonPressed = SpeedValue;
+        //SpeedValueToSetWhenSetButtonPressed = SpeedValue
         Serial.println("Encoder Function Changed To SPEED");
         Serial.println("Current Value:");
-        Serial.println(ValueToSetWhenSetButtonPressed);
+        Serial.println(SpeedValueToSetWhenSetButtonPressed);
       }
-		}
+		//}
 		// Remember last button press event
 		lastButtonPress = millis();
 
@@ -336,13 +365,24 @@ void setup() {
 
 void loop() {
   // if the user is pressing the button to use the encoder knob
-  useEncoderButtonState = digitalRead(useEncoderButton);
+  useEncoderButtonPressed = digitalRead(useEncoderButton);
+  //useEncoderButtonState = digitalRead(useEncoderButton);
   // debounce
   delay(100);
+  if (useEncoderButtonPressed == LOW){
+    Serial.println("UseEncoderButton Pressed");
+    useEncoderButtonState = 1;
+  }
+  //if (useEncoderButtonState == HIGH){
+  //  Serial.println("UseEncoderButton Pressed");
+  //}
   // while that button is pressed
-  while (useEncoderButtonState == LOW){
+  while (useEncoderButtonState == 1){
+  //while (useEncoderButtonState == LOW){
+  //while (useEncoderButtonState == HIGH){
     // Read the encoder button state
     EncoderButtonState = digitalRead(rotary_function_pin);
+    delay(100);
     //If we detect LOW signal, button is pressed
 	  if (EncoderButtonState == LOW) {
       // toggle function of rotary encoder to control either speed or timing
@@ -352,6 +392,11 @@ void loop() {
     }
     // now we read rotary control input to dial in proper speed and timing
     read_rotary_input();
+
+    // check if button has been released, if so, break loop operation
+    if (useEncoderButtonState == 0){
+      break;
+    }
   }
 /*
 ================================================================================
