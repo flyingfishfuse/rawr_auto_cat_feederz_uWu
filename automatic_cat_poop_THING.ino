@@ -127,6 +127,9 @@ Button pinout and variables
 const int  cleanbuttonPin = 12;
 // current state of the button
 int cleanbuttonState = 0;
+
+// current state of machine if cleaning
+int CleaningState;
 // EncoderClickCount for the number of button presses
 int cleanbuttonPushEncoderClickCount = 0;
 // previous state of the button
@@ -234,8 +237,8 @@ void ChangeEncoderFunction(){
 		lastButtonPress = millis();
 
 	// Put in a slight delay to help debounce the reading
-	delay(1000);
-
+	//delay(100);
+  Serial.println("End of ChangeEncoderFunction()");
 }
 
 /******************************************************************************
@@ -385,6 +388,7 @@ void loop() {
     delay(100);
     //If we detect LOW signal, button is pressed
 	  if (EncoderButtonState == LOW) {
+    // (EncoderButtonState == LOW) {
       // toggle function of rotary encoder to control either speed or timing
       ChangeEncoderFunction();
       // debounce
@@ -393,8 +397,11 @@ void loop() {
     // now we read rotary control input to dial in proper speed and timing
     read_rotary_input();
 
+    useEncoderButtonPressed = digitalRead(useEncoderButton);
     // check if button has been released, if so, break loop operation
-    if (useEncoderButtonState == 0){
+    //if (useEncoderButtonState == 0){
+    if (useEncoderButtonPressed == HIGH){
+      Serial.println("UseEncoderButton released");
       break;
     }
   }
@@ -412,6 +419,10 @@ void loop() {
   cleanbuttonState = digitalRead(cleanbuttonPin);
   // Delay a little bit to avoid bouncing
   delay(50);
+  if (cleanbuttonState == LOW){
+    Serial.println("cleanbuttonState Pressed");
+    CleaningState = 1;
+  }
       // compare the buttonState to its previous state
   if (cleanbuttonState == LOW && !pwmRunning){ // != lastcleanButtonState) {
       // clean the litter! 
