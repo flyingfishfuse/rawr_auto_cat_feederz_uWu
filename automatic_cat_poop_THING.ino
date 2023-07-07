@@ -126,7 +126,7 @@ Button pinout and variables
 // the pin that the pushbutton is attached to
 const int  cleanbuttonPin = 12;
 // current state of the button
-int cleanbuttonState = 0;
+int cleanbuttonState;
 
 // current state of machine if cleaning
 int CleaningState;
@@ -364,6 +364,10 @@ void setup() {
   // Read the initial state of CLK
 	lastStateCLK = digitalRead(CLK);
 
+  // initialize the motor speed and spin time variables with the 
+  // variables holding the deault values
+  SpinTimeValueToSetWhenSetButtonPressed = SpinTime
+  SpeedValueToSetWhenSetButtonPressed = SpeedValue
 }
 
 void loop() {
@@ -380,8 +384,8 @@ void loop() {
   //  Serial.println("UseEncoderButton Pressed");
   //}
   // while that button is pressed
-  while (useEncoderButtonState == 1){
-  //while (useEncoderButtonState == LOW){
+  //while (useEncoderButtonState == 1){
+  while (useEncoderButtonPressed == LOW){
   //while (useEncoderButtonState == HIGH){
     // Read the encoder button state
     EncoderButtonState = digitalRead(rotary_function_pin);
@@ -397,7 +401,7 @@ void loop() {
     // now we read rotary control input to dial in proper speed and timing
     read_rotary_input();
 
-    useEncoderButtonPressed = digitalRead(useEncoderButton);
+    //useEncoderButtonPressed = digitalRead(useEncoderButton);
     // check if button has been released, if so, break loop operation
     //if (useEncoderButtonState == 0){
     if (useEncoderButtonPressed == HIGH){
@@ -426,6 +430,7 @@ void loop() {
       // compare the buttonState to its previous state
   if (cleanbuttonState == LOW && !pwmRunning){ // != lastcleanButtonState) {
       // clean the litter! 
+      Serial.println("cleanbuttonState Pressed");
       clean();
     }
   // save the current state as the last state, for next time through the loop
